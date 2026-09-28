@@ -21,8 +21,13 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: echo "REVISION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Build, testes e publicacao da imagem
+      # Build e testes sem acesso aos secrets
+      - name: Build e testes
+        run: ./mvnw -B -ntp clean verify -Drevision=${REVISION:-1.0.0}
+
+      # So o Jib recebe as credenciais do Docker Hub
+      - name: Publicacao da imagem
         env:
           DOCKER_REGISTRY_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: ./mvnw -B -ntp clean verify jib:build -Drevision=${REVISION:-1.0.0}
+        run: ./mvnw -B -ntp jib:build -Drevision=${REVISION:-1.0.0}
