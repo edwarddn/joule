@@ -30,4 +30,4 @@ jobs:
         env:
           DOCKER_REGISTRY_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: ./mvnw -B -ntp jib:build -Drevision=${REVISION:-1.0.0}
+        run: ./mvnw -B -ntp jib:build -Drevision=${REVISION:-1.0.0} -Djib.from.platforms=linux/amd64,linux/arm64
