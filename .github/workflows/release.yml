@@ -1,28 +1,28 @@
-#name: release
-#
-#on:
-#  push:
-#    tags: [ 'v*' ]
-#  workflow_dispatch:
-#
-#jobs:
-#  image:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#
-#      - uses: actions/setup-java@v4
-#        with:
-#          distribution: temurin
-#          java-version: '25'
-#          cache: maven
-#
-#      - name: Versao a partir da tag
-#        if: startsWith(github.ref, 'refs/tags/v')
-#        run: echo "REVISION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-#
-#      - name: Build, testes e publicacao da imagem
-#        env:
-#          DOCKER_REGISTRY_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-#          DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
-#        run: ./mvnw -B -ntp clean verify jib:build -Drevision=${REVISION:-1.0.0}
+name: release
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Versao a partir da tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: echo "REVISION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Build, testes e publicacao da imagem
+        env:
+          DOCKER_REGISTRY_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKER_REGISTRY_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: ./mvnw -B -ntp clean verify jib:build -Drevision=${REVISION:-1.0.0}
