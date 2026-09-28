@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: joule
+    version: test
+nobreak:
+  serial-port: ""
+  monitor-interval-seconds: 30
+  shutdown-delay-seconds: 60
+  shutdown-enabled: true
+  shutdown-steps: 3
+  critical-temperature: 90
+mqtt:
+  enabled: false
+  broker:
+    url: tcp://localhost:1883
+    username: ""
+    password: ""
+  client:
+    id: joule-test
+  state-topic: joule/nobreak/status
+homeassistant:
+  device-id: nobreak
+  discovery:
+    enabled: true
+    prefix: homeassistant
+ssh:
+  ssh-timeout: 5000
+  shutdown-command: sudo -n poweroff
+  servers: []

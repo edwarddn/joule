@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.1.0 https://maven.apache.org/xsd/maven-4.1.0.xsd">
+    <modelVersion>4.1.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.1.0</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>br.com.edward</groupId>
+    <artifactId>joule</artifactId>
+    <version>${revision}</version>
+
+    <name>joule</name>
+    <description>Monitor de nobreak via USB com telemetria para o Home Assistant</description>
+    <url>https://github.com/edwarddn/joule</url>
+
+    <licenses>
+        <license>
+            <name>GNU General Public License v3.0 only</name>
+            <url>https://www.gnu.org/licenses/gpl-3.0.html</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <properties>
+        <revision>1.0.0</revision>
+        <java.version>25</java.version>
+
+        <!-- Dependências -->
+        <paho.version>1.2.5</paho.version>
+        <jserialcomm.version>2.11.4</jserialcomm.version>
+        <sshj.version>0.40.0</sshj.version>
+
+        <!-- Imagem (Jib) -->
+        <jib-maven-plugin.version>3.5.1</jib-maven-plugin.version>
+        <jib-spring-boot-extension.version>0.1.0</jib-spring-boot-extension.version>
+        <docker.registry>docker.io</docker.registry>
+        <docker.namespace>edwarddn</docker.namespace>
+
+        <!-- Tests -->
+        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+        <jacoco.maven.plugin.version>0.8.15</jacoco.maven.plugin.version>
+        <jacoco.min-coverage>0.7</jacoco.min-coverage>
+    </properties>
+
+    <dependencies>
+
+        <!-- Spring -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson</artifactId>
+        </dependency>
+
+        <!-- MQTT -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-integration</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.integration</groupId>
+            <artifactId>spring-integration-mqtt</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+            <version>${paho.version}</version>
+        </dependency>
+
+        <!-- Comunicação Serial -->
+        <dependency>
+            <groupId>com.fazecast</groupId>
+            <artifactId>jSerialComm</artifactId>
+            <version>${jserialcomm.version}</version>
+        </dependency>
+
+        <!-- SSH -->
+        <dependency>
+            <groupId>com.hierynomus</groupId>
+            <artifactId>sshj</artifactId>
+            <version>${sshj.version}</version>
+        </dependency>
+
+        <!-- Lombok / Devtools -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jackson-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.integration</groupId>
+            <artifactId>spring-integration-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- Jib: constrói e publica a imagem OCI sem daemon do Docker e sem Dockerfile -->
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>${jib-maven-plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.google.cloud.tools</groupId>
+                        <artifactId>jib-spring-boot-extension-maven</artifactId>
+                        <version>${jib-spring-boot-extension.version}</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <pluginExtensions>
+                        <pluginExtension>
+                            <implementation>com.google.cloud.tools.jib.maven.extension.springboot.JibSpringBootExtension</implementation>
+                        </pluginExtension>
+                    </pluginExtensions>
+                    <from>
+                        <image>bellsoft/liberica-runtime-container:jre-25-musl</image>
+                    </from>
+                    <to>
+                        <image>${docker.registry}/${docker.namespace}/${project.artifactId}:${project.version}</image>
+                        <tags>
+                            <tag>latest</tag>
+                        </tags>
+                        <auth>
+                            <username>${env.DOCKER_REGISTRY_USER}</username>
+                            <password>${env.DOCKER_REGISTRY_PASSWORD}</password>
+                        </auth>
+                    </to>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <argLine>@{argLine} -Dfile.encoding=UTF-8 -Duser.country=BR -Duser.language=pt -Duser.region=BR -Duser.timezone=GMT-3 -Dspring.profiles.active=test</argLine>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.maven.plugin.version}</version>
+                <configuration>
+                    <excludes>
+                        <exclude>**/NobreakApplication*</exclude>
+                        <exclude>**/integration/**</exclude>
+                        <exclude>**/config/**</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>default-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>after:test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>coverage-check</id>
+                        <phase>after:test</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.min-coverage}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
+    </build>
+
+</project>

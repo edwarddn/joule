@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: @project.name@
+    version: @project.version@
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  threads:
+    virtual:
+      enabled: true
+  jackson:
+    default-property-inclusion: NON_NULL
+logging:
+  file:
+    name: logs/@project.name@.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: ./logs/@project.name@.%d{yyyy-MM-dd}.%i.log.gz
+      max-history: 128
+      max-file-size: 128MB
+      clean-history-on-start: true
+nobreak:
+  serial-port: ${NOBREAK_PORT:/dev/ttyACM0}
+  monitor-interval-seconds: ${MONITOR_INTERVAL_SECONDS:30}
+  shutdown-delay-seconds: ${SHUTDOWN_DELAY:60}
+  shutdown-enabled: ${SHUTDOWN_ENABLED:true}
+  shutdown-steps: ${SHUTDOWN_STEPS:3}
+  critical-temperature: ${CRITICAL_TEMPERATURE:90}
+mqtt:
+  enabled: ${MQTT_ENABLED:true}
+  broker:
+    url: ${MQTT_URL:tcp://localhost:1883}
+    username: ${MQTT_USER:}
+    password: ${MQTT_PASS:}
+  client:
+    id: @project.name@
+  state-topic: ${MQTT_STATE_TOPIC:joule/nobreak/status}
+homeassistant:
+  device-id: ${HA_DEVICE_ID:nobreak}
+  discovery:
+    enabled: ${HA_DISCOVERY_ENABLED:true}
+    prefix: ${HA_DISCOVERY_PREFIX:homeassistant}
+ssh:
+  ssh-timeout: ${SSH_TIMEOUT:5000}
+  shutdown-command: ${SSH_SHUTDOWN_COMMAND:sudo -n poweroff}
+  servers: []

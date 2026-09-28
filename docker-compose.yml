@@ -1,0 +1,62 @@
+services:
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+
+  joule:
+    image: edwarddn/joule:latest
+    container_name: joule
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      TZ: America/Sao_Paulo
+      JAVA_TOOL_OPTIONS: >-
+        -Duser.language=pt -Duser.country=BR
+        -Duser.timezone=America/Sao_Paulo -Dfile.encoding=UTF-8
+        --enable-native-access=ALL-UNNAMED
+
+      NOBREAK_PORT: ${NOBREAK_PORT:-/dev/ttyACM0}
+      MONITOR_INTERVAL_SECONDS: ${MONITOR_INTERVAL_SECONDS:-30}
+      SHUTDOWN_ENABLED: ${SHUTDOWN_ENABLED:-true}
+      SHUTDOWN_STEPS: ${SHUTDOWN_STEPS:-3}
+      SHUTDOWN_DELAY: ${SHUTDOWN_DELAY:-60}
+      CRITICAL_TEMPERATURE: ${CRITICAL_TEMPERATURE:-90}
+
+      MQTT_ENABLED: ${MQTT_ENABLED:-true}
+      MQTT_URL: ${MQTT_URL:-tcp://mosquitto:1883}
+      MQTT_USER: ${MQTT_USER:-}
+      MQTT_PASS: ${MQTT_PASS:-}
+      MQTT_STATE_TOPIC: ${MQTT_STATE_TOPIC:-joule/nobreak/status}
+
+      HA_DISCOVERY_ENABLED: ${HA_DISCOVERY_ENABLED:-true}
+      HA_DISCOVERY_PREFIX: ${HA_DISCOVERY_PREFIX:-homeassistant}
+      HA_DEVICE_ID: ${HA_DEVICE_ID:-nobreak}
+
+      # Servidores desligados por SSH quando a energia nao volta.
+      # A ordem importa: a maquina que hospeda o Joule vai por ultimo.
+      # Descomente junto com o volume da chave privada la embaixo.
+      # SSH_SERVERS_0_NAME: nas
+      # SSH_SERVERS_0_HOST: 192.168.1.50
+      # SSH_SERVERS_0_PORT: "22"
+      # SSH_SERVERS_0_USER: admin
+      # SSH_SERVERS_0_PRIVATE_KEY_PATH: /workspace/keys/id_ed25519
+
+      # SSH_SERVERS_1_NAME: host
+      # SSH_SERVERS_1_HOST: 192.168.1.10
+      # SSH_SERVERS_1_PORT: "22"
+      # SSH_SERVERS_1_USER: admin
+      # SSH_SERVERS_1_PRIVATE_KEY_PATH: /workspace/keys/id_ed25519
+    devices:
+      - ${NOBREAK_PORT:-/dev/ttyACM0}:${NOBREAK_PORT:-/dev/ttyACM0}
+    volumes:
+      - ./logs:/workspace/logs
+      # - ./keys/id_ed25519:/workspace/keys/id_ed25519:ro
