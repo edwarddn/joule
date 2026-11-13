@@ -1,10 +1,18 @@
-# Joule
+# Joule: monitor de nobreak Ragtech para Home Assistant
 
-Monitor de nobreak via USB que publica a telemetria no Home Assistant por MQTT e, quando a
-energia não volta, desliga os servidores com segurança antes que a bateria acabe. Quando a energia
-volta, o nobreak religa a saída e os servidores sobem sozinhos.
+Monitor de nobreak Ragtech (linha Easy Pro / New Easy Pro NEP) via USB que publica a telemetria no
+Home Assistant por MQTT e, quando a energia não volta, desliga os servidores com segurança antes
+que a bateria acabe. Quando a energia volta, o nobreak religa a saída e os servidores sobem
+sozinhos.
 
 Foi escrito para uso doméstico, roda em container e não depende de nuvem nem de serviço externo.
+
+> **In English:** Joule is a USB monitor for Ragtech UPS units (Easy Pro / New Easy Pro NEP line).
+> It publishes telemetry and alarms to Home Assistant via MQTT Discovery and, when the power does not
+> come back, safely shuts down your servers over SSH before the battery runs out. When the power
+> returns, the UPS turns its output back on and the servers boot by themselves. Runs in Docker on
+> `linux/amd64` and `linux/arm64` (Raspberry Pi). Tested only on the Ragtech 4162 (NEP 1200). The
+> rest of the documentation is in Brazilian Portuguese; issues in English are welcome.
 
 ## Aviso importante, leia antes de usar
 
@@ -44,6 +52,23 @@ sensores criados automaticamente.
 Até agora ele **só foi testado em Linux, rodando em Docker**. Se você usar no macOS ou no Windows,
 funcionando ou não, deixe seu feedback numa [issue](https://github.com/edwarddn/joule/issues). É
 assim que a lista de plataformas suportadas cresce.
+
+## Joule ou NUT?
+
+O [Network UPS Tools](https://networkupstools.org/) (NUT) tem um driver
+[`ragtech`](https://networkupstools.org/docs/man/ragtech.html) para a mesma linha Easy Pro, também
+feito por engenharia reversa e marcado como experimental. Se você já usa NUT na sua rede, vale
+olhar.
+
+O Joule é uma alternativa independente, para quem quer algo pronto sem montar a pilha do NUT:
+
+* um container só, para `amd64` e `arm64`, configurado por variáveis de ambiente;
+* entidades criadas sozinhas no Home Assistant por MQTT Discovery, incluindo avisos e falhas do
+  nobreak;
+* desligamento dos servidores por SSH, na ordem que você definir, sem instalar cliente nenhum
+  neles;
+* religamento automático: na falta de energia, o nobreak é armado para cortar a saída e religá-la
+  quando a rede voltar.
 
 ## Equipamento testado
 
