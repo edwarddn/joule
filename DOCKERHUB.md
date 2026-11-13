@@ -67,7 +67,7 @@ No Home Assistant, os sensores aparecem assim:
 | Tag      | Descrição                         |
 | -------- | --------------------------------- |
 | `latest` | Última versão publicada.          |
-| `x.y.z`  | Versão fixa, por exemplo `0.0.2`. |
+| `x.y.z`  | Versão fixa, por exemplo `0.1.0`. |
 
 Arquiteturas: `linux/amd64` e `linux/arm64`.
 
