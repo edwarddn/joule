@@ -119,7 +119,7 @@ public class RagtechEasy {
                 .loadPercentage(carga)
                 .realPower(carga / 100.0 * modelo.getPotenciaNominalVa() * FATOR_POTENCIA)
                 .batteryVoltage(m.v(V_VBATTERY) * modelo.fatorTensaoBateria())
-                .batteryPercentage(Math.min(100.0, m.v(V_CBATTERY) * 0.393))
+                .batteryPercentage(Math.clamp(m.v(V_CBATTERY) * 0.393, 0.0, 100.0))
                 .temperature(temperatura)
                 .shutdownTimer(m.v(V_SHUTDOWNTIMER) != 0 ? m.v(V_SHUTDOWNTIMER) : null)
                 .wakeupTimer(wakeup)

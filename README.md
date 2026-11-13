@@ -8,18 +8,18 @@ Foi escrito para uso doméstico, roda em container e não depende de nuvem nem d
 
 ## Aviso importante, leia antes de usar
 
-Este projeto foi feito por **engenharia reversa** do protocolo serial do nobreak, observando os
-bytes trocados na porta USB.
+Este projeto foi feito por **engenharia reversa**, sem nenhuma documentação oficial do protocolo.
 
-* Eu **nunca tive acesso** a documentação, especificação, SDK, firmware ou qualquer material
-  técnico da Ragtech.
+* Eu **nunca tive acesso** a documentação técnica, especificação, SDK ou firmware fornecidos pela
+  Ragtech.
+* O mapa do protocolo (endereços, fórmulas de conversão, bits de status e comandos) foi montado a
+  partir de informações de origem não oficial, que podem estar incompletas ou erradas, e **só foi
+  validado no meu equipamento**, o 4162. Nos outros modelos da linha, os valores lidos e os comandos
+  enviados podem estar errados, mesmo que o modelo pareça igual.
 * Este projeto **não tem nenhum vínculo** com a Ragtech Eletrônica Industrial Ltda. Não é
   autorizado, homologado, patrocinado nem revisado por ela. "Ragtech", "Easy Pro" e "Supervise" são
   marcas de seus titulares e aparecem aqui apenas para indicar com qual equipamento o software foi
   testado e qual software ele substitui.
-* Os valores de calibração, os bits de status e os comandos de desligamento foram **deduzidos por
-  observação**. Eles funcionam no meu equipamento. Podem estar errados no seu, mesmo que o modelo
-  pareça igual.
 
 **Use por sua conta e risco.** Este software envia comandos que cortam a saída do nobreak e
 desligam máquinas. Um comando interpretado de forma diferente pelo seu equipamento pode causar

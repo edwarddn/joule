@@ -12,10 +12,12 @@ Feito para uso doméstico. Roda em container, sem nuvem e sem serviço externo.
 
 ## Aviso importante
 
-O protocolo do nobreak foi obtido por **engenharia reversa**, observando os bytes trocados na porta
-USB. Este projeto **não tem nenhum vínculo** com a Ragtech Eletrônica Industrial Ltda. "Ragtech",
-"Easy Pro" e "Supervise" são marcas de seus titulares e aparecem aqui apenas para indicar com qual
-equipamento o software foi testado e qual software ele substitui.
+O protocolo do nobreak foi obtido por **engenharia reversa**, sem documentação oficial, a partir de
+informações de origem não oficial que podem estar erradas. Só foi validado no modelo 4162; nos
+outros, os valores e os comandos podem estar errados. Este projeto **não tem nenhum vínculo** com a
+Ragtech Eletrônica Industrial Ltda. "Ragtech", "Easy Pro" e "Supervise" são marcas de seus
+titulares e aparecem aqui apenas para indicar com qual equipamento o software foi testado e qual
+software ele substitui.
 
 **Use por sua conta e risco.** O Joule envia comandos que cortam a saída do nobreak e desligam
 máquinas. Teste com carga sem importância antes de confiar nele. Sem qualquer garantia, nos termos
