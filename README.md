@@ -47,58 +47,117 @@ assim que a lista de plataformas suportadas cresce.
 
 ## Equipamento testado
 
-| Fabricante | Modelo                 | Conexão   | Situação              |
-| ---------- | ---------------------- | --------- | --------------------- |
-| Ragtech    | 4162 Easy Pro NEP 1200 | USB (CDC) | Testado em uso diário |
+| Fabricante | Modelo                                     | Conexão   | Situação              |
+| ---------- | ------------------------------------------ | --------- | --------------------- |
+| Ragtech    | 4162 New Easy Pro NEP 1200 (`EASY 1200 TI`) | USB (CDC) | Testado em uso diário |
 
-Outros modelos da mesma linha **talvez** funcionem, porque provavelmente compartilham o protocolo.
-Ninguém confirmou. Se você testar em outro modelo, abra uma issue contando o resultado, com ou sem
-sucesso, e cole o pacote cru lido do equipamento. Para vê-lo, suba com log em debug:
+### Em teoria compatíveis
+
+O nobreak informa o próprio modelo, e o Joule ajusta as fórmulas sozinho para estes, que **talvez** funcionem, porque provavelmente compartilham o mesmo mapa de memória do 4162 e mudam só a potência, a tensão de saída, a bateria e a calibração da
+corrente. **Nenhum deles foi testado.** Ao subir com um deles, o Joule avisa no log.
+
+| Modelo         | Potência | Saída | Bateria |
+| -------------- | -------- | ----- | ------- |
+| `EASY 600 TI`  | 600 VA   | 115 V | 12 V    |
+| `EASY 600 M2`  | 600 VA   | 220 V | 12 V    |
+| `EASY 700 TI`  | 700 VA   | 115 V | 12 V    |
+| `EASY 700 M2`  | 700 VA   | 220 V | 12 V    |
+| `EASY 900 TI`  | 900 VA   | 115 V | 12 V    |
+| `EASY 900 M2`  | 900 VA   | 220 V | 12 V    |
+| `EASY 1200 M2` | 1200 VA  | 220 V | 12 V    |
+| `EASY 1300 TI` | 1300 VA  | 115 V | 24 V    |
+| `EASY 1300 M2` | 1300 VA  | 220 V | 24 V    |
+| `EASY 1400 TI` | 1400 VA  | 115 V | 24 V    |
+| `EASY 1400 M2` | 1400 VA  | 220 V | 24 V    |
+| `EASY 1600 TI` | 1600 VA  | 115 V | 24 V    |
+| `EASY 1600 M2` | 1600 VA  | 220 V | 24 V    |
+| `EASY 1800 TI` | 1800 VA  | 115 V | 24 V    |
+| `EASY 1800 M2` | 1800 VA  | 220 V | 24 V    |
+| `EASY 2000 TI` | 2000 VA  | 115 V | 24 V    |
+| `EASY 2000 M2` | 2000 VA  | 220 V | 24 V    |
+| `EASY 2200 TI` | 2200 VA  | 115 V | 24 V    |
+| `EASY 2200 M2` | 2200 VA  | 220 V | 24 V    |
+
+Se o seu é um deles, conte numa issue se funcionou, com ou sem sucesso. É assim que ele entra na
+tabela de testados.
+
+### Tem outro modelo?
+
+Outras linhas da Ragtech (Senium, Infinium, Save, Precision...) provavelmente usam mapas diferentes e **não são
+suportadas**. Dá para tentar adicionar o suporte a partir dos logs do seu equipamento. Suba com log
+em debug:
 
 ```yaml
     environment:
       LOGGING_LEVEL_BR_COM_EDWARD_JOULE: DEBUG
 ```
 
-Cada leitura passa a sair assim, e é isso que ajuda a mapear o protocolo:
+Cada troca com o nobreak passa a sair assim, comando e resposta:
 
 ```
-| Pacote lido: AA 1E 00 80 ...
+| [serial] AA 04 00 80 1E 9E -> AA 09 00 0C 59 09 A7 D1 FF ...
 ```
+
+Abra uma issue com o modelo exato (o da etiqueta) e os logs completos, incluindo o handshake do
+início, alguns minutos com a rede normal e, se puder, uma falta de energia forçada (tirar o nobreak
+da tomada por um minuto, com uma carga sem importância ligada).
 
 ## O que ele faz
 
 1. Abre a porta USB do nobreak, faz o handshake e passa a consultar o status em intervalo
    configurável.
-2. Decodifica o pacote de 31 bytes e extrai tensão de entrada e saída, corrente, potência,
-   frequência, tensão e carga da bateria, temperatura interna e os bits de status.
+2. Lê a memória do nobreak e extrai tensão de entrada e saída, corrente, potência estimada,
+   frequência, tensão e carga da bateria, temperatura interna, modelo, firmware e as 20 flags de
+   estado, aviso e falha.
 3. Publica o estado em um tópico MQTT retido e registra os sensores no Home Assistant por MQTT
    Discovery, sem precisar editar nenhum YAML do HA.
 4. Se a rede elétrica cai e não volta dentro do limite configurado, arma o desligamento do nobreak
    **com religamento automático** e manda `poweroff` nos servidores cadastrados, via SSH. Quando a
    energia volta, o nobreak religa a saída sozinho.
-5. Em situação crítica, bateria no fim ou temperatura acima do limite, desliga imediatamente e
-   **sem** religamento automático.
+5. Se o nobreak acusa uma falha grave (sobretemperatura, curto-circuito, sobrecarga, tensão de
+   saída anormal, fim de bateria), a bateria fica crítica fora da rede ou a temperatura passa de
+   `CRITICAL_TEMPERATURE`, arma o desligamento em 30 segundos, tempo para o `poweroff` dos
+   servidores terminar, e **sem** religamento automático.
+6. Se a falha é do inversor ou de tensão da bateria, que não derrubam a energia enquanto houver
+   rede, desliga com o tempo normal de `SHUTDOWN_DELAY`, também **sem** religamento automático.
+   Com o nobreak em falha, é melhor alguém olhar antes de religar.
+
+Antes de desligar por falha, o Joule relê o nobreak para confirmar, e não age sobre um pacote
+corrompido.
 
 Cada etapa é opcional. Dá para usar só a telemetria, só o desligamento, ou os dois.
 
 ## Entidades criadas no Home Assistant
 
-Com o discovery ligado, aparece um dispositivo chamado "Nobreak" com estes sensores:
+Com o discovery ligado, aparece um dispositivo chamado "Nobreak" com estas entidades:
 
 ![Dispositivo Nobreak no Home Assistant](docs/home-assistant.png)
 
-| Entidade                   | Descrição           | Unidade |
-| -------------------------- | ------------------- | ------- |
-| `sensor.nobreak_in_volt`   | Tensão de entrada   | V       |
-| `sensor.nobreak_out_volt`  | Tensão de saída     | V       |
-| `sensor.nobreak_power`     | Potência real       | W       |
-| `sensor.nobreak_freq`      | Frequência          | Hz      |
-| `sensor.nobreak_bat_volt`  | Tensão da bateria   | V       |
-| `sensor.nobreak_bat_level` | Nível da bateria    | %       |
-| `sensor.nobreak_temp`      | Temperatura interna | °C      |
-| `sensor.nobreak_load`      | Carga de saída      | %       |
-| `sensor.nobreak_status`    | Status operacional  | texto   |
+| Entidade                                    | Descrição                                           | Unidade |
+| ------------------------------------------- | --------------------------------------------------- | ------- |
+| `sensor.nobreak_in_volt`                    | Tensão de entrada                                   | V       |
+| `sensor.nobreak_out_volt`                   | Tensão de saída                                     | V       |
+| `sensor.nobreak_out_amp`                    | Corrente de saída                                   | A       |
+| `sensor.nobreak_power`                      | Potência estimada (carga × potência nominal × 0,7)  | W       |
+| `sensor.nobreak_freq`                       | Frequência                                          | Hz      |
+| `sensor.nobreak_bat_volt`                   | Tensão da bateria                                   | V       |
+| `sensor.nobreak_bat_level`                  | Nível da bateria                                    | %       |
+| `sensor.nobreak_temp`                       | Temperatura interna                                 | °C      |
+| `sensor.nobreak_load`                       | Carga de saída                                      | %       |
+| `sensor.nobreak_status`                     | Status operacional                                  | texto   |
+| `sensor.nobreak_alertas`                    | Avisos e falhas ativos, ou "nenhum"                 | texto   |
+| `sensor.nobreak_desligamento`               | Desligamento armado ("em 45 s") ou "nenhum"         | texto   |
+| `binary_sensor.nobreak_em_bateria`          | Operando em bateria                                 |         |
+| `binary_sensor.nobreak_bateria_baixa`       | Bateria baixa                                       |         |
+| `binary_sensor.nobreak_sobrecarga`          | Carga alta ou falha de sobrecarga                   |         |
+| `binary_sensor.nobreak_falha`               | Qualquer falha ativa                                |         |
+| `binary_sensor.nobreak_rede_sincronizada`   | Sincronizado com a rede elétrica                    |         |
+
+Na seção de diagnóstico ficam modelo, firmware do nobreak, sensibilidade de rede, tensão nominal
+de entrada e potência nominal.
+
+A corrente e a frequência dependem de valores de calibração gravados no nobreak. Se ele não os
+informar, as duas ficam como desconhecidas em vez de mostrar um número errado.
 
 O prefixo `nobreak` vem de `HA_DEVICE_ID` e pode ser trocado, útil se você tiver mais de um
 equipamento.
@@ -232,7 +291,7 @@ Para não desligar nem o nobreak, desative o desligamento automático:
       SHUTDOWN_ENABLED: "false"
 ```
 
-Isso vale para todos os gatilhos, inclusive a temperatura crítica e o status crítico. O Joule continua
+Isso vale para todos os gatilhos, inclusive a temperatura crítica e as falhas do nobreak. O Joule continua
 monitorando e publicando a telemetria, e registra no log quando teria desligado.
 
 ### Desligando servidores por SSH
@@ -306,30 +365,32 @@ novo. Ela deve ligar sozinha. Dá para testar direto na tomada, sem envolver o n
 
 ### Quando o religamento não acontece
 
-Em situação crítica (bateria no fim, temperatura acima de `CRITICAL_TEMPERATURE` ou status
-crítico), o Joule desliga **sem** religamento automático, porque não é seguro voltar a ligar com o
-nobreak nesse estado. Depois de resolver o problema, ligue o nobreak manualmente pelo botão.
+Nos desligamentos por falha (falha acusada pelo nobreak, bateria crítica fora da rede ou
+temperatura acima de `CRITICAL_TEMPERATURE`), o Joule desliga **sem** religamento automático,
+porque não é seguro voltar a ligar com o nobreak nesse estado. Depois de resolver o problema, ligue o nobreak manualmente pelo botão.
 
 ## Variáveis de ambiente
 
 ### Nobreak
 
 | Variável                   | Padrão         | Descrição                                                                       |
-| -------------------------- | -------------- | ------------------------------------------------------------------------------- |
+| ------------------------------------------- | --------------------------------------------------- | ------- |
 | `NOBREAK_PORT`             | `/dev/ttyACM0` | Porta serial do nobreak dentro do container. Vazio desliga o monitoramento.     |
 | `MONITOR_INTERVAL_SECONDS` | `30`           | Intervalo entre leituras de status.                                             |
 | `SHUTDOWN_ENABLED`         | `true`         | `false` desativa todo desligamento automático, inclusive os de emergência.      |
 | `SHUTDOWN_STEPS`           | `3`            | Quantas leituras seguidas em bateria antes de iniciar o desligamento. Mínimo 1. |
 | `SHUTDOWN_DELAY`           | `60`           | Segundos entre o comando e o corte da saída do nobreak. Faixa aceita: 1 a 90.   |
-| `CRITICAL_TEMPERATURE`     | `90`           | Acima disso o desligamento é imediato e sem religamento automático.             |
+| `CRITICAL_TEMPERATURE`     | `90`           | Acima disso desliga em 30 segundos, sem religamento automático, mesmo que o nobreak não acuse sobretemperatura. |
 
 Com os padrões, a energia precisa ficar fora por cerca de 90 segundos (3 leituras a cada 30) para o
-desligamento começar, e as máquinas ainda têm 60 segundos antes de o nobreak cortar a saída.
+desligamento começar, e as máquinas ainda têm 60 segundos antes de o nobreak cortar a saída. Nos
+desligamentos por falha o tempo não depende de `SHUTDOWN_STEPS`: são 30 segundos nas falhas graves e
+`SHUTDOWN_DELAY` nas do inversor e da bateria.
 
 ### MQTT
 
 | Variável           | Padrão                 | Descrição                                                       |
-| ------------------ | ---------------------- | --------------------------------------------------------------- |
+| ------------------------------------------- | --------------------------------------------------- | ------- |
 | `MQTT_ENABLED`     | `true`                 | `false` desliga o MQTT por completo e joga a telemetria no log. |
 | `MQTT_URL`         | `tcp://localhost:1883` | `tcp://` sem criptografia ou `ssl://` com TLS.                  |
 | `MQTT_USER`        | vazio                  | Usuário do broker. Vazio conecta sem autenticação.              |
@@ -339,7 +400,7 @@ desligamento começar, e as máquinas ainda têm 60 segundos antes de o nobreak 
 ### Home Assistant
 
 | Variável               | Padrão          | Descrição                                                         |
-| ---------------------- | --------------- | ----------------------------------------------------------------- |
+| ------------------------------------------- | --------------------------------------------------- | ------- |
 | `HA_DISCOVERY_ENABLED` | `true`          | `false` não registra as entidades, mas segue publicando o estado. |
 | `HA_DISCOVERY_PREFIX`  | `homeassistant` | Prefixo de discovery, o mesmo configurado no HA.                  |
 | `HA_DEVICE_ID`         | `nobreak`       | Identificador do dispositivo e prefixo das entidades.             |
@@ -347,7 +408,7 @@ desligamento começar, e as máquinas ainda têm 60 segundos antes de o nobreak 
 ### SSH
 
 | Variável                           | Padrão             | Descrição                                       |
-| ---------------------------------- | ------------------ | ----------------------------------------------- |
+| ------------------------------------------- | --------------------------------------------------- | ------- |
 | `SSH_TIMEOUT`                      | `5000`             | Timeout de conexão e leitura, em milissegundos. |
 | `SSH_SHUTDOWN_COMMAND`             | `sudo -n poweroff` | Comando enviado a cada servidor.                |
 | `SSH_SERVERS_<n>_NAME`             |                    | Nome do servidor, só para aparecer no log.      |
@@ -362,22 +423,58 @@ Payload publicado em `MQTT_STATE_TOPIC`:
 
 ```json
 {
-  "input_volt": 127.0,
-  "output_volt": 119.9,
+  "input_volt": 212.0,
+  "output_volt": 111.6,
   "battery_volt": 13.3,
-  "battery_pct": 98,
-  "output_amp": 2.85,
-  "real_power": 239.2,
+  "battery_pct": 100,
+  "output_amp": 0.46,
+  "real_power": 25.2,
   "frequency": 60.0,
-  "temperature": 31,
-  "load_pct": 24,
+  "temperature": 47,
+  "load_pct": 3,
+  "desligamento": "nenhum",
+  "modelo": 6,
+  "modelo_nome": "EASY 1200 TI",
+  "modelo_testado": true,
+  "firmware": 1.4,
+  "nominal_input_volt": 220.0,
+  "nominal_output_volt": 115.0,
+  "nominal_frequency": 60.0,
+  "nominal_power": 1200.0,
+  "nominal_battery_volt": 12.0,
+  "line_sense": "desligada",
+  "ic_battery": false,
+  "flags": ["REDE_SINCRONIZADA"],
+  "alertas": "nenhum",
+  "falha": false,
   "status_desc": "REDE (Normal)",
   "status_enum": "NORMAL"
 }
 ```
 
-Valores possíveis de `status_enum`: `NORMAL`, `EM_BATERIA`, `SOBREAQUECIMENTO`, `BATERIA_CRITICA`.
-Os dois últimos são tratados como críticos e disparam desligamento imediato.
+Campos sem valor não são publicados: `output_amp` e `frequency` sem calibração, `shutdown_timer`
+sem desligamento armado e `wakeup_timer`/`nightoff_timer` sem religamento agendado.
+
+Valores possíveis de `status_enum`, do mais grave para o mais leve:
+
+| Valor                 | O que acontece                                            |
+| --------------------- | --------------------------------------------------------- |
+| `SOBREAQUECIMENTO`    | Desliga em 30 s, sem religar.                             |
+| `FALHA_CRITICA`       | Desliga em 30 s, sem religar.                             |
+| `BATERIA_CRITICA`     | Desliga em 30 s, sem religar.                             |
+| `FALHA`               | Desliga em `SHUTDOWN_DELAY`, sem religar.                 |
+| `EM_BATERIA`          | Conta para `SHUTDOWN_STEPS`; desliga e religa com a rede. |
+| `AUTOTESTE`           | Nada.                                                     |
+| `CARGA_ALTA`          | Só aviso no log.                                          |
+| `REDE_INSTAVEL`       | Nada.                                                     |
+| `BATERIA_COM_DEFEITO` | Só aviso no log.                                          |
+| `NORMAL`              | Nada.                                                     |
+
+Valores possíveis em `flags`: `EM_BATERIA`, `AUTOTESTE`, `SEM_ENTRADA`, `REDE_SINCRONIZADA`,
+`CONTROLE_REMOTO`, `ENTRADA_BAIXA`, `ENTRADA_ALTA`, `CARGA_ALTA`, `BATERIA_BAIXA`, `SEM_BATERIA`,
+`BATERIA_VELHA`, `MAIS_BATERIA`, `MENOS_BATERIA`, `FALHA_SOBRETEMPERATURA`, `FALHA_FIM_DE_BATERIA`,
+`FALHA_SOBRECARGA`, `FALHA_SAIDA_ANORMAL`, `FALHA_CURTO_CIRCUITO`, `FALHA_BATERIA_ANORMAL` e
+`FALHA_INVERSOR`.
 
 ## Permissão da porta serial
 
@@ -407,9 +504,9 @@ no `pom.xml` e exporte `DOCKER_REGISTRY_USER` e `DOCKER_REGISTRY_PASSWORD`.
 
 ## Contribuindo
 
-Relatos de compatibilidade são muito bem-vindos, tanto de outros modelos de nobreak, com o pacote
-cru que sai no log em debug, quanto de outras plataformas, como macOS e Windows. É assim que o mapa
-do protocolo e a lista de plataformas crescem.
+Relatos de compatibilidade são muito bem-vindos, tanto dos modelos EASY ainda não testados e de
+outras linhas, com os logs em debug (veja [Tem outro modelo?](#tem-outro-modelo)), quanto de outras
+plataformas, como macOS e Windows. É assim que a lista de equipamentos e de plataformas cresce.
 
 ## Licença
 

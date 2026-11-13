@@ -33,6 +33,12 @@ public class HaConfigModel {
     @JsonProperty("state_class")
     private final String stateClass;
 
+    @JsonProperty("suggested_display_precision")
+    private final Integer suggestedDisplayPrecision;
+
+    @JsonProperty("entity_category")
+    private final String entityCategory;
+
     @JsonProperty("state_topic")
     private final String stateTopic;
 

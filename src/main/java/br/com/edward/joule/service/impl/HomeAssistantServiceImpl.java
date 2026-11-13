@@ -26,13 +26,19 @@ public class HomeAssistantServiceImpl implements HomeAssistantService {
 
     @Override
     public void publicarConfig(final HaConfigModel config) {
+        this.publicarConfig("sensor", config);
+    }
+
+    @Override
+    public void publicarConfig(final String componente, final HaConfigModel config) {
         if (!this.discoveryEnabled || !this.mqttIntegration.ativo()) {
             log.debug("| Discovery não publicado para {}.", config.getUniqueId());
             return;
         }
 
-        final var topic = String.format("%s/sensor/%s/config",
+        final var topic = String.format("%s/%s/%s/config",
                 this.discoveryPrefix,
+                componente,
                 config.getUniqueId());
 
         this.mqttIntegration.publish(topic, config, true);

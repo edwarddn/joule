@@ -11,6 +11,14 @@ public interface NobreakService {
     void desliga(int segundos);
     void desliga(int segundos, boolean religarAutomaticamente);
 
+    void definirSensibilidadeRede(boolean ligada);
+    void alterarCorLed(int vermelho, int verde, int azul, int aleatorio);
+    void iniciarDescargaCompleta();
+    void cancelarDescargaCompleta();
+    void agendarReligamento(long segundos);
+    void agendarDesligamentoNoturno(long segundos);
+    void supervisao(boolean ligada);
+
     void registrarNobreak();
     void closePort();
 }

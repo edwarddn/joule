@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Edward
 package br.com.edward.joule.scheduled;
 
+import br.com.edward.joule.enums.EnumFlagNobreak;
 import br.com.edward.joule.enums.EnumStatusNobreak;
 import br.com.edward.joule.model.NobreakModel;
 import br.com.edward.joule.service.NobreakService;
@@ -10,13 +11,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.*;
 
 class MonitorNobreakTests {
 
@@ -31,7 +31,7 @@ class MonitorNobreakTests {
         final var monitor = new MonitorNobreak(nobreakService, sshService);
         ReflectionTestUtils.setField(monitor, "shutdownEnabled", shutdownEnabled);
         ReflectionTestUtils.setField(monitor, "shutdownSteps", shutdownSteps);
-        ReflectionTestUtils.setField(monitor, "criticalTemperature", 90);
+        ReflectionTestUtils.setField(monitor, "shutdownDelaySeconds", 60);
         return monitor;
     }
 
@@ -66,25 +66,57 @@ class MonitorNobreakTests {
     }
 
     @Test
-    @DisplayName("Temperatura acima do limite força desligamento imediato sem religar")
-    void testSuperaquecimentoDesligaImediato() {
-        when(nobreakService.status()).thenReturn(base().temperature(95).build());
+    @DisplayName("Sobreaquecimento: relê, desliga em 30 s sem religar e desliga os servidores")
+    void testSobreaquecimentoDesligaEm30s() {
+        when(nobreakService.status()).thenReturn(base()
+                .temperature(95)
+                .status(EnumStatusNobreak.SOBREAQUECIMENTO)
+                .build());
 
         monitor(3).monitorar();
 
-        verify(nobreakService).desliga(10, false);
+        verify(nobreakService, times(2)).status();
+        verify(nobreakService).desliga(30, false);
         verify(sshService).shutdownAllServers();
     }
 
     @Test
-    @DisplayName("Status crítico força desligamento imediato")
-    void testStatusCriticoDesligaImediato() {
+    @DisplayName("Falha crítica e bateria crítica também desligam em 30 s sem religar")
+    void testOutrasEmergencias() {
+        when(nobreakService.status()).thenReturn(base().status(EnumStatusNobreak.FALHA_CRITICA).build());
+        monitor(3).monitorar();
+        verify(nobreakService).desliga(30, false);
+
         when(nobreakService.status()).thenReturn(base().status(EnumStatusNobreak.BATERIA_CRITICA).build());
+        monitor(3).monitorar();
+        verify(nobreakService, times(2)).desliga(30, false);
+    }
+
+    @Test
+    @DisplayName("Falha do inversor: desliga no SHUTDOWN_DELAY, sem religar")
+    void testFalhaCalma() {
+        when(nobreakService.status()).thenReturn(base()
+                .flags(Set.of(EnumFlagNobreak.FALHA_INVERSOR))
+                .status(EnumStatusNobreak.FALHA)
+                .build());
 
         monitor(3).monitorar();
 
-        verify(nobreakService).desliga(10, false);
+        verify(nobreakService).desliga(60, false);
         verify(sshService).shutdownAllServers();
+    }
+
+    @Test
+    @DisplayName("Falha que some na releitura não desliga nada")
+    void testFalhaNaoConfirmada() {
+        when(nobreakService.status()).thenReturn(
+                base().status(EnumStatusNobreak.FALHA_CRITICA).build(),
+                base().build());
+
+        monitor(3).monitorar();
+
+        verify(nobreakService, never()).desliga(anyInt(), anyBoolean());
+        verifyNoInteractions(sshService);
     }
 
     @Test
@@ -99,22 +131,33 @@ class MonitorNobreakTests {
     }
 
     @Test
-    @DisplayName("Em bateria: ao atingir o limite de tentativas, desliga")
+    @DisplayName("Em bateria: ao atingir o limite de tentativas, desliga com religamento")
     void testEmBateriaAtingeLimiteDesliga() {
         when(nobreakService.status()).thenReturn(base().status(EnumStatusNobreak.EM_BATERIA).build());
 
         monitor(1).monitorar();
 
         verify(nobreakService).desliga();
+        verify(nobreakService, never()).desliga(anyInt(), anyBoolean());
         verify(sshService).shutdownAllServers();
+    }
+
+    @Test
+    @DisplayName("Entrada abaixo de 50 V conta como falta de energia mesmo sem a flag")
+    void testEntradaZeradaSemFlag() {
+        when(nobreakService.status()).thenReturn(base().inputVoltage(5.0).build());
+
+        monitor(1).monitorar();
+
+        verify(nobreakService).desliga();
     }
 
     @Test
     @DisplayName("Falha no comando do nobreak não impede o desligamento dos servidores")
     void testFalhaNoNobreakNaoImpedeShutdownDosServidores() {
-        when(nobreakService.status()).thenReturn(base().temperature(95).build());
+        when(nobreakService.status()).thenReturn(base().status(EnumStatusNobreak.SOBREAQUECIMENTO).build());
         doThrow(new IllegalStateException("porta serial fora do ar"))
-                .when(nobreakService).desliga(10, false);
+                .when(nobreakService).desliga(30, false);
 
         monitor(3).monitorar();
 
@@ -145,24 +188,13 @@ class MonitorNobreakTests {
     }
 
     @Test
-    @DisplayName("Desligamento desativado: temperatura crítica não desliga nada")
-    void testDesativadoSuperaquecimentoNaoDesliga() {
-        when(nobreakService.status()).thenReturn(base().temperature(95).build());
+    @DisplayName("Desligamento desativado: emergência não desliga nada")
+    void testDesativadoEmergenciaNaoDesliga() {
+        when(nobreakService.status()).thenReturn(base().status(EnumStatusNobreak.SOBREAQUECIMENTO).build());
 
         monitor(3, false).monitorar();
 
-        verify(nobreakService, never()).desliga(10, false);
-        verifyNoInteractions(sshService);
-    }
-
-    @Test
-    @DisplayName("Desligamento desativado: status crítico não desliga nada")
-    void testDesativadoStatusCriticoNaoDesliga() {
-        when(nobreakService.status()).thenReturn(base().status(EnumStatusNobreak.BATERIA_CRITICA).build());
-
-        monitor(3, false).monitorar();
-
-        verify(nobreakService, never()).desliga(10, false);
+        verify(nobreakService, never()).desliga(anyInt(), anyBoolean());
         verifyNoInteractions(sshService);
     }
 

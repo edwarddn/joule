@@ -7,4 +7,5 @@ import br.com.edward.joule.model.HaConfigModel;
 public interface HomeAssistantService {
 
     void publicarConfig(HaConfigModel config);
+    void publicarConfig(String componente, HaConfigModel config);
 }

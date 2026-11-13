@@ -34,21 +34,25 @@ Até agora só foi testado em **Linux com Docker**. Se usar no macOS ou no Windo
 
 ## Equipamento testado
 
-| Fabricante | Modelo                 | Conexão   |
-| ---------- | ---------------------- | --------- |
-| Ragtech    | 4162 Easy Pro NEP 1200 | USB (CDC) |
+| Fabricante | Modelo                                      | Conexão   |
+| ---------- | ------------------------------------------- | --------- |
+| Ragtech    | 4162 New Easy Pro NEP 1200 (`EASY 1200 TI`) | USB (CDC) |
 
-Outros modelos da mesma linha talvez funcionem. Se testar em outro, conte o resultado numa
-[issue](https://github.com/edwarddn/joule/issues).
+Os demais modelos da linha EASY (600 a 2200 VA, TI e M2) usam o mesmo mapa e são reconhecidos
+automaticamente, mas **não foram testados**. A lista está no
+[README](https://github.com/edwarddn/joule#em-teoria-compatíveis). Se testar em um deles, ou tiver
+outro modelo, conte numa [issue](https://github.com/edwarddn/joule/issues) com os logs em debug.
 
 ## O que ele faz
 
-* Lê tensão de entrada e saída, potência, frequência, bateria, temperatura, carga e status.
+* Lê tensão de entrada e saída, corrente, potência estimada, frequência, bateria, temperatura,
+  carga, modelo, firmware e as flags de aviso e falha do nobreak.
 * Publica o estado por MQTT e cria os sensores no Home Assistant via MQTT Discovery, sem editar YAML.
 * Se a energia não volta, manda `poweroff` nos servidores via SSH e arma o nobreak para cortar a
   saída e religá-la quando a energia voltar.
-* Em situação crítica (bateria no fim ou temperatura alta), desliga na hora, sem religamento
-  automático.
+* Em falha grave do nobreak, bateria crítica ou temperatura alta, desliga em 30 segundos, sem
+  religamento automático. Em falha do inversor ou da bateria, desliga com o tempo normal, também
+  sem religar.
 
 Cada parte é opcional: dá para usar só a telemetria, só o desligamento, ou os dois.
 
@@ -151,7 +155,7 @@ O Raspberry Pi não precisa de nada, ele liga sempre que recebe energia. Detalhe
 | `SHUTDOWN_ENABLED`         | `true`                 | `false` desativa todo desligamento automático.          |
 | `SHUTDOWN_STEPS`           | `3`                    | Leituras seguidas em bateria antes de desligar.         |
 | `SHUTDOWN_DELAY`           | `60`                   | Segundos até o nobreak cortar a saída (1 a 90).         |
-| `CRITICAL_TEMPERATURE`     | `90`                   | Temperatura, em °C, que dispara desligamento imediato.  |
+| `CRITICAL_TEMPERATURE`     | `90`                   | Temperatura, em °C, que dispara desligamento em 30 s.   |
 | `MQTT_ENABLED`             | `true`                 | `false` desliga o MQTT.                                 |
 | `MQTT_URL`                 | `tcp://localhost:1883` | `tcp://` sem criptografia ou `ssl://` com TLS.          |
 | `HA_DISCOVERY_ENABLED`     | `true`                 | `false` não cria as entidades no Home Assistant.        |

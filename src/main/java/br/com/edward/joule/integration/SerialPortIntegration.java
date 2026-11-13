@@ -4,9 +4,9 @@ package br.com.edward.joule.integration;
 
 public interface SerialPortIntegration {
 
-    byte[] lerStatusBruto();
-
-    String enviarComando(byte[] comando, String descricao);
-
+    byte[] ler(int endereco, int tamanho);
+    boolean gravarByte(int endereco, int valor);
+    boolean ligarBits(int endereco, int mascara);
+    boolean desligarBits(int endereco, int mascara);
     void closePort();
 }

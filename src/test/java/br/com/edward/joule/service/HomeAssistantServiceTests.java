@@ -9,13 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class HomeAssistantServiceTests {
 
@@ -44,6 +39,19 @@ class HomeAssistantServiceTests {
         homeAssistantService(true).publicarConfig(config);
 
         verify(mqttIntegration).publish(eq("homeassistant/sensor/nobreak_temp/config"), eq(config), eq(true));
+    }
+
+    @Test
+    @DisplayName("Com componente explícito, a config vai para o tópico daquele componente")
+    void testPublicaBinario() {
+        final var config = HaConfigModel.builder()
+                .uniqueId("nobreak_falha")
+                .stateTopic("joule/nobreak/status")
+                .build();
+
+        homeAssistantService(true).publicarConfig("binary_sensor", config);
+
+        verify(mqttIntegration).publish(eq("homeassistant/binary_sensor/nobreak_falha/config"), eq(config), eq(true));
     }
 
     @Test

@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 Edward
 package br.com.edward.joule.scheduled;
 
-import br.com.edward.joule.enums.EnumStatusNobreak;
+import br.com.edward.joule.enums.EnumFlagNobreak;
+import br.com.edward.joule.enums.EnumStatusNobreak.Acao;
+import br.com.edward.joule.model.NobreakModel;
 import br.com.edward.joule.service.NobreakService;
 import br.com.edward.joule.service.SshService;
 import jakarta.annotation.PostConstruct;
@@ -14,9 +16,12 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -24,8 +29,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor(onConstructor = @__(@Lazy))
 public class MonitorNobreak {
 
+    static final int SEGUNDOS_EMERGENCIA = 30;
+
+    private static final Set<EnumFlagNobreak> AVISOS_LOGADOS =
+            EnumSet.of(EnumFlagNobreak.SEM_BATERIA, EnumFlagNobreak.BATERIA_VELHA, EnumFlagNobreak.CARGA_ALTA);
+
     private final AtomicInteger count = new AtomicInteger(0);
     private boolean inShutdown = false;
+    private Set<EnumFlagNobreak> avisosAtivos = EnumSet.noneOf(EnumFlagNobreak.class);
 
     private final NobreakService nobreakService;
     private final SshService sshService;
@@ -36,8 +47,8 @@ public class MonitorNobreak {
     @Value("${nobreak.shutdown-steps}")
     private int shutdownSteps;
 
-    @Value("${nobreak.critical-temperature}")
-    private int criticalTemperature;
+    @Value("${nobreak.shutdown-delay-seconds}")
+    private int shutdownDelaySeconds;
 
     @PostConstruct
     void validar() {
@@ -62,52 +73,81 @@ public class MonitorNobreak {
             return;
         }
 
-        if (status.getTemperature() > this.criticalTemperature) {
-            if (!this.inShutdown) {
-                log.warn("| EMERGÊNCIA: temperatura crítica ({}°C). Desligando IMEDIATAMENTE.", status.getTemperature());
-                this.desligarForce();
-            }
-            return;
-        }
+        this.logarAvisosNovos(status);
 
-        if (status.getStatus().isCritico()) {
-            if (!this.inShutdown) {
-                log.warn("| EMERGÊNCIA: status crítico ({}). Desligando IMEDIATAMENTE.", status.getStatus().getDescricao());
-                this.desligarForce();
-            }
-            return;
-        }
-
-        if (EnumStatusNobreak.EM_BATERIA.equals(status.getStatus()) || status.getInputVoltage() < 50) {
-            final var tentativaAtual = this.count.incrementAndGet();
-            log.warn("| Atenção: operando sem rede principal (Status: {} | Bateria: {}% | Entrada: {}V). Tentativa {}/{}",
-                    status.getStatus().getDescricao(),
-                    status.getBatteryPercentage().intValue(),
-                    status.getInputVoltage(),
-                    tentativaAtual,
-                    this.shutdownSteps);
-
-            if (!this.inShutdown && tentativaAtual >= this.shutdownSteps) {
-                log.info("| Tempo limite de segurança esgotado. Desligando.");
-                this.desligar();
-            }
-        } else {
-            if (this.inShutdown) {
-                this.inShutdown = false;
-            }
-            if (this.count.get() > 0) {
-                log.info("| Energia estabilizada (rede OK). Contador resetado.");
-                this.count.set(0);
+        switch (status.getStatus().getAcao()) {
+            case EMERGENCIA, CALMA -> this.tratarFalha(status);
+            case CONTAR_FALTA -> this.tratarFalta(status);
+            case NENHUMA -> {
+                if (status.getInputVoltage() < 50) {
+                    this.tratarFalta(status);
+                } else {
+                    this.normal();
+                }
             }
         }
     }
 
-    private void desligar() {
-        this.executarDesligamento(this.nobreakService::desliga);
+    private void tratarFalha(final NobreakModel status) {
+        if (this.inShutdown) {
+            return;
+        }
+
+        final var confirmacao = this.nobreakService.status();
+        if (Objects.isNull(confirmacao) || !ehFalha(confirmacao.getStatus().getAcao())) {
+            log.warn("| Falha do nobreak não confirmada na releitura ({}). Ignorando.", status.getStatus().getDescricao());
+            return;
+        }
+
+        final var emergencia = confirmacao.getStatus().getAcao() == Acao.EMERGENCIA;
+        final var segundos = emergencia ? SEGUNDOS_EMERGENCIA : this.shutdownDelaySeconds;
+        log.warn("| {}: {} (alertas: {}). Desligando em {}s, sem religamento automático.",
+                emergencia ? "EMERGÊNCIA" : "FALHA",
+                confirmacao.getStatus().getDescricao(),
+                confirmacao.alertasTexto(),
+                segundos);
+
+        this.executarDesligamento(() -> this.nobreakService.desliga(segundos, false));
     }
 
-    private void desligarForce() {
-        this.executarDesligamento(() -> this.nobreakService.desliga(10, false));
+    private void tratarFalta(final NobreakModel status) {
+        final var tentativaAtual = this.count.incrementAndGet();
+        log.warn("| Atenção: operando sem rede principal (Status: {} | Bateria: {}% | Entrada: {}V). Tentativa {}/{}",
+                status.getStatus().getDescricao(),
+                status.getBatteryPercentage().intValue(),
+                status.getInputVoltage(),
+                tentativaAtual,
+                this.shutdownSteps);
+
+        if (!this.inShutdown && tentativaAtual >= this.shutdownSteps) {
+            log.info("| Tempo limite de segurança esgotado. Desligando.");
+            this.executarDesligamento(this.nobreakService::desliga);
+        }
+    }
+
+    private void normal() {
+        if (this.inShutdown) {
+            this.inShutdown = false;
+        }
+        if (this.count.get() > 0) {
+            log.info("| Energia estabilizada (rede OK). Contador resetado.");
+            this.count.set(0);
+        }
+    }
+
+    private void logarAvisosNovos(final NobreakModel status) {
+        final var atuais = status.getFlags().stream()
+                .filter(AVISOS_LOGADOS::contains)
+                .collect(Collectors.toCollection(() -> EnumSet.noneOf(EnumFlagNobreak.class)));
+        final var novos = EnumSet.copyOf(atuais);
+        novos.removeAll(this.avisosAtivos);
+        this.avisosAtivos = atuais;
+
+        novos.forEach(aviso -> log.warn("| Aviso do nobreak: {}.", aviso.getDescricao()));
+    }
+
+    private static boolean ehFalha(final Acao acao) {
+        return acao == Acao.EMERGENCIA || acao == Acao.CALMA;
     }
 
     // os servidores sao desligados mesmo se o comando do nobreak falhar, e vice-versa
